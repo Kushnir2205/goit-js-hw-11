@@ -1,5 +1,6 @@
-import {PixabayApi} from '../src/js/pixabay-api';
-import {createGalleryCards} from '../src/js/gallery.js'
+import Notiflix from 'notiflix';
+import { PixabayApi } from '../src/js/pixabay-api';
+import { createGalleryCards } from '../src/js/gallery.js';
 
 const pixabayApi = new PixabayApi();
 
@@ -9,55 +10,69 @@ const searchFormEl = document.querySelector('.search-form');
 const galleryContainer = document.querySelector('.gallery-container');
 const loadMoreBtnEl = document.querySelector('.load-more');
 
-pixabayApi.fetchPhotosByQuery(); 
+pixabayApi.fetchPhotosByQuery();
 
-const onSearchFormElSubmit = event => {
-    event.preventDefault();
+const onSearchFormElSubmit = async event => {
+  event.preventDefault();
+  if (event.target.elements.searchQuery.value.trim() === '') {
+    return Notiflix.Notify.failure(
+      'Sorry, there are no images matching your search query. Please try again.'
+    );
+  }
+  pixabayApi.page = 1;
+  pixabayApi.q = event.target.elements.searchQuery.value.trim();
+  try {
+    const { data } = await pixabayApi.fetchPhotosByQuery();
 
-    pixabayApi.q = event.target.elements.searchQuery.value;
-    pixabayApi.fetchPhotosByQuery().then(img => {
-        console.log(img);
-        galleryContainer.innerHTML = createGalleryCards(img.hits);
-        loadMoreBtnEl.classList.remove('is-hidden')
-    }).catch(err =>{
-        console.log(err);
-    })
+    if (data.total === 0) {
+      galleryContainer.innerHTML = ' ';
+      loadMoreBtnEl.classList.add('is-hidden');
+      return Notiflix.Notify.failure(
+        'Sorry, there are no images matching your search query. Please try again.'
+      );
+    } else if (data.total <= 40) {
+      console.log(loadMoreBtnEl);
+      loadMoreBtnEl.classList.add('is-hidden');
+      Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images.`);
+
+      galleryContainer.innerHTML = createGalleryCards(data.hits);
+    } else {
+      Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images.`);
+      loadMoreBtnEl.classList.remove('is-hidden');
+      galleryContainer.innerHTML = createGalleryCards(data.hits);
+    }
+    console.log(data);
+    galleryContainer.innerHTML = createGalleryCards(data.hits);
+  } catch (err) {
+    console.log(err);
+  }
 };
 
+const onLoadMoreBtnElClick = async event => {
+  pixabayApi.page += 1;
+  try {
+    const { data } = await pixabayApi.fetchPhotosByQuery();
 
-const onLoadMoreBtnElClick = event => {
-    pixabayApi.page += 1;
-   
-    pixabayApi.fetchPhotosByQuery().then(img => {
-        galleryContainer.insertAdjacentHTML('beforeend', createGalleryCards(img.hits));
-    }).catch(err => {
-        console.log(err);
-    });
-}
+    if (data.totalHits < pixabayApi.page * 40) {
+      console.log(data.hits);
+      loadMoreBtnEl.classList.add('is-hidden');
+      galleryContainer.insertAdjacentHTML(
+        'beforeend',
+        createGalleryCards(data.hits)
+      );
+      return Notiflix.Notify.failure(
+        "We're sorry, but you've reached the end of search results."
+      );
+    }
+    galleryContainer.insertAdjacentHTML(
+      'beforeend',
+      createGalleryCards(data.hits)
+    );
+    loadMoreBtnEl.classList.remove('is-hidden');
+  } catch (err) {
+    console.log(err);
+  }
+};
 
 searchFormEl.addEventListener('submit', onSearchFormElSubmit);
 loadMoreBtnEl.addEventListener('click', onLoadMoreBtnElClick);
-
-
-
-
-
-
-
-
-
-
-
-
-// const onloadMoreClickFoo = e => {
-    
-//     jsonPixabayApi.page += 1;
-//     jsonPixabayApi.fetchFromAPi()
-//         .then(images => {
-//             galleryListEl.insertAdjacentHTML('beforeend', createImgCard(images.hits))
-//         console.log(images);
-//         })
-//         .catch(err => {
-//             console.log(err);
-//     })
-// }
